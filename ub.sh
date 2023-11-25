@@ -95,11 +95,6 @@ warn() { echo -e "\e[1;33mWARNING:\e[33m $@\e[0m"; }
 success() { echo -e "\e[1;32mSUCCESS:\e[32m $@\e[0m"; }
 info() { echo -e "\e[1;34mINFO:\e[34m $@\e[0m"; }
 
-warn hi
-success hi
-info hi
-error hi
-
 ###########
 # PARSING #
 ###########
