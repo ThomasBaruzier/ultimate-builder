@@ -72,16 +72,17 @@ default_config() {
 }
 
 main() {
+  echo
   default_config
   format_linked_args "$@"
   parse_args "${formatted[@]}"
   empty_args_config
   verify_args
-  print_config
+#  print_config
   get_targets
   get_files
   verify_targets
-  print_debug
+  print_status
 #  build
 #  execute
 }
@@ -90,7 +91,7 @@ main() {
 # UTILS #
 #########
 
-error() { echo -e "\e[1;31mERROR:\e[31m $@\e[0m"; exit 1; }
+error() { echo -e "\e[1;31mERROR:\e[31m $@\e[0m\n"; exit 1; }
 warn() { echo -e "\e[1;33mWARNING:\e[33m $@\e[0m"; }
 success() { echo -e "\e[1;32mSUCCESS:\e[32m $@\e[0m"; }
 info() { echo -e "\e[1;34mINFO:\e[34m $@\e[0m"; }
@@ -211,6 +212,17 @@ format_linked_args() {
   done
 }
 
+replace_aliases() {
+  for ((i=0; i < "${#to_verify[@]}"; i++)); do
+    [ "${#to_verify[i]}" = 1 ] && \
+    for ((j=0; j < "${#to_compare[@]}"; j++)); do
+      to_compare_tmp="${to_compare[j]#+}"
+      [ "${to_verify[i]}" = "${to_compare_tmp:0:1}" ] \
+      && to_verify["$i"]="${to_compare[j]#+}" && break
+    done
+  done
+}
+
 verify_arg() {
   to_compare=("$@")
   replace_aliases
@@ -223,11 +235,7 @@ verify_arg() {
       fi
       [ "$i" = "${j#+}" ] && match="$i" && break
     done
-    if [ -z "$match" ]; then
-      error "Unknown parameter: $i"
-      return 1
-    fi
-    return 0
+    [ -z "$match" ] && error "Unknown parameter: $i"
   done
 }
 
@@ -240,17 +248,6 @@ verify_array() {
     done
   done
   [ -z "$match" ] && return 1 || return 0
-}
-
-replace_aliases() {
-  for ((i=0; i < "${#to_verify[@]}"; i++)); do
-    [ "${#to_verify[i]}" = 1 ] && \
-    for ((j=0; j < "${#to_compare[@]}"; j++)); do
-      to_compare_tmp="${to_compare[j]#+}"
-      [ "${to_verify[i]}" = "${to_compare_tmp:0:1}" ] \
-      && to_verify["$i"]="${to_compare[j]#+}" && break
-    done
-  done
 }
 
 ######################
@@ -348,7 +345,7 @@ get_files() {
     done
   fi
   if [ -n "$build_tests" ]; then
-    for file in tests/*.c; do
+    for file in tests/**/*.c; do
       [ -f "$file" ] && tests_files+=("$file")
     done
   fi
@@ -361,40 +358,44 @@ get_files() {
 }
 
 verify_targets() {
+  unset sep
+
   if [ -z "$main_files" ]; then
-    [ -n "$exec_main" ] && unset exec_main \
-    && warn 'No files found for executing main'
-    [ -n "$build_main" ] && unset build_main \
+    [ -n "$exec_main" ] && unset exec_main && sep=true \
+    && warn 'No files found or build instructions given for executing main'
+    [ -n "$build_main" ] && unset build_main && sep=true \
     && warn 'No files found for building main'
-    [ -n "$live_main" ] && unset live_main \
+    [ -n "$live_main" ] && unset live_main && sep=true \
     && warn 'No files found for activating live mode for main'
-    [ -n "$headers_main" ] && unset headers_main \
+    [ -n "$headers_main" ] && unset headers_main && sep=true \
     && warn 'No files found for generating headers for main'
     [ -n "$exec_main" ] && [ ! -f "$bin_path" ] && \
-    [ -z "$build_main" ] && unset exec_main \
-    && warn 'No binary or build instructions for executing main'
+    [ -z "$build_main" ] && unset exec_main && sep=true \
+    && warn 'No binary or build instructions given for executing main'
   fi
 
   if [ -z "$tests_files" ]; then
-    [ -n "$exec_tests" ] && unset exec_tests \
-    && warn 'No files found for executing tests'
-    [ -n "$build_tests" ] && unset build_tests \
+    [ -n "$exec_tests" ] && unset exec_tests && sep=true \
+    && warn 'No files found or build instructions given for executing tests'
+    [ -n "$build_tests" ] && unset build_tests && sep=true \
     && warn 'No files found for building tests'
-    [ -n "$live_tests" ] && unset live_main \
+    [ -n "$live_tests" ] && unset live_main && sep=true \
     && warn 'No files found for activating live mode for tests'
     [ -n "$exec_tests" ] && [ ! -f "$tests_path" ] && \
-    [ -z "$build_tests" ] && unset exec_tests \
-    && warn 'No binary or build instructions for executing tests'
+    [ -z "$build_tests" ] && unset exec_tests && sep=true \
+    && warn 'No binary or build instructions given for executing tests'
   fi
 
   if [ -z "$lib_files" ]; then
-    [ -n "$build_lib" ] && unset build_lib \
+    [ -n "$build_lib" ] && unset build_lib && sep=true \
     && warn 'No files found for building lib'
-    [ -n "$live_lib" ] && unset live_lib \
+    [ -n "$live_lib" ] && unset live_lib && sep=true \
     && warn 'No files found for live mode for lib'
-    [ -n "$headers_lib" ] && unset headers_lib \
+    [ -n "$headers_lib" ] && unset headers_lib && sep=true \
     && warn 'No files found for generating headers for lib'
   fi
+
+  [ -n "$sep" ] && echo
 }
 
 ###################
@@ -412,44 +413,42 @@ verify_targets() {
 ############
 
 help() {
-  echo
   echo "Usage: $0 [OPTIONS]"
   echo
-  echo "Build options:"
-  echo "  -b --build         none all main tests lib"
-  echo "  -x --execute       none all main tests"
-  echo "  -B --build-exec    none all main tests lib"
-  echo "  -l --live          none all main tests lib"
-  echo "  -H --headers       none all main lib"
-  echo "  -f --flags         none opti debug werror slow csfml"
+  echo 'Build options:'
+  echo '  -b --build         none all main tests lib'
+  echo '  -x --execute       none all main tests'
+  echo '  -B --build-exec    none all main tests lib'
+  echo '  -l --live          none all main tests lib'
+  echo '  -H --headers       none all main lib'
+  echo '  -f --flags         none opti debug werror slow csfml'
   echo
-  echo "Output paths:"
-  echo "  -X --bin-path      [path]"
-  echo "  -L --lib-path      [path]"
-  echo "  -T --tests-path    [path]"
+  echo 'Output paths:'
+  echo '  -X --bin-path      [path]'
+  echo '  -L --lib-path      [path]'
+  echo '  -T --tests-path    [path]'
   echo
-  echo "Execution options:"
-  echo "  -a --args          [str1] [str2] ..."
-  echo "  -t --timeout       none all main tests + seconds"
-  echo "  -p --cat-pipe      true false"
-  echo "  -k --sigkill       true false"
-  echo "  -m --makefile      true false"
+  echo 'Execution options:'
+  echo '  -a --args          [str1] [str2] ...'
+  echo '  -t --timeout       none all main tests + seconds'
+  echo '  -p --cat-pipe      true false'
+  echo '  -k --sigkill       true false'
+  echo '  -m --makefile      true false'
   echo
-  echo "Code review:"
-  echo "  -s --coding-style  ananas banana mango"
-  echo "  -g --gcovr         none all lines branches"
-  echo "  -v --valgrind      none all main tests"
+  echo 'Code review:'
+  echo '  -s --coding-style  ananas banana mango'
+  echo '  -g --gcovr         none all lines branches'
+  echo '  -v --valgrind      none all main tests'
   echo
-  echo "Cleaning:"
-  echo "  -c --clean         none all objects lib bin headers"
-  echo "  -C --clean-before  none all objects lib bin headers"
+  echo 'Cleaning:'
+  echo '  -c --clean         none all objects lib bin headers'
+  echo '  -C --clean-before  none all objects lib bin headers'
   echo
   exit
 }
 
 print_config() {
-  echo
-  echo "Build options:"
+  echo 'Build options:'
   echo "  build: ${build[@]}"
   echo "  execute: ${execute[@]}"
   echo "  build_exec: ${build_exec[@]}"
@@ -457,43 +456,43 @@ print_config() {
   echo "  headers: ${headers[@]}"
   echo "  flags: ${flags[@]}"
   echo
-  echo "Output paths:"
+  echo 'Output paths:'
   echo "  bin_path: $bin_path"
   echo "  lib_path: $lib_path"
   echo "  tests_path: $tests_path"
   echo
-  echo "Execution options:"
+  echo 'Execution options:'
   echo -n "  args:"; printf " '%s'" "${args[@]}"; echo
   echo "  timeout: ${timeout[@]}"
   echo "  cat_pipe: $cat_pipe"
   echo "  sigkill: $sigkill"
   echo "  makefile: $makefile"
   echo
-  echo "Code review:"
+  echo 'Code review:'
   echo "  coding_style: ${coding_style[@]}"
   echo "  gcovr: ${gcovr[@]}"
   echo "  valgrind: ${valgrind[@]}"
   echo
-  echo "Cleaning:"
+  echo 'Cleaning:'
   echo "  clean: ${clean[@]}"
   echo "  clean_before: ${clean_before[@]}"
   echo
 }
 
-print_debug() {
+print_status() {
   unset task
-  [ -n "$build_main" ] && task=true && echo "Building main..."
-  [ -n "$build_tests" ] && task=true && echo "Building tests..."
-  [ -n "$build_lib" ] && task=true && echo "Building lib..."
-  [ -n "$exec_main" ] && task=true && echo "Executing main..."
-  [ -n "$exec_tests" ] && task=true && echo "Executing tests..."
-  [ -n "$live_main" ] && task=true && echo "Live main..."
-  [ -n "$live_tests" ] && task=true && echo "Live tests..."
-  [ -n "$live_lib" ] && task=true && echo "Live lib..."
-  [ -n "$headers_main" ] && task=true && echo "Headers for main..."
-  [ -n "$headers_lib" ] && task=true && echo "Headers for lib..."
-
-  [ -z "$task" ] && info 'Nothing to do'
+  [ -n "$build_main" ] && task=true && info 'Building main...'
+  [ -n "$build_tests" ] && task=true && info 'Building tests...'
+  [ -n "$build_lib" ] && task=true && info 'Building lib...'
+  [ -n "$exec_main" ] && task=true && info 'Executing main...'
+  [ -n "$exec_tests" ] && task=true && info 'Executing tests...'
+  [ -n "$live_main" ] && task=true && info 'Live main...'
+  [ -n "$live_tests" ] && task=true && info 'Live tests...'
+  [ -n "$live_lib" ] && task=true && info 'Live lib...'
+  [ -n "$headers_main" ] && task=true && info 'Headers for main...'
+  [ -n "$headers_lib" ] && task=true && info 'Headers for lib...'
+  [ -z "$task" ] && info "Nothing to do, try '$0 --help'"
+  echo
 }
 
 main "$@"
