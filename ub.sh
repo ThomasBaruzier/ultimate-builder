@@ -5,40 +5,9 @@
 # By Thomas Baruzier
 #
 
-#################
-# CONFIG & MAIN #
-#################
-
-empty_args_config() {
-  # Build options
-  [ -n "$build_arg" ] && build=(all)
-  [ -n "$execute_arg" ] && execute=(all)
-  [ -n "$build_exec_arg" ] && build_exec=(all)
-  [ -n "$live_arg" ] && live=(all)
-  [ -n "$headers_arg" ] && headers=(all)
-  [ -n "$flags_arg" ] && flags=(debug werror)
-
-  # Output paths
-  [ -n "$bin_path_arg" ] && bin_path=main
-  [ -n "$lib_path_arg" ] && lib_path=lib/libmy.a
-  [ -n "$tests_path_arg" ] && tests_path=tests/unit_tests
-
-  # Execution options
-  [ -n "$args_arg" ] && args=('>These<' '>are the defaults<' '>execution args<' '>provided by U.B.<')
-  [ -n "$timeout_arg" ] && timeout=(tests 10)
-  [ -n "$cat_pipe_arg" ] && cat_pipe=true
-  [ -n "$sigkill_arg" ] && sigkill=true
-  [ -n "$makefile_arg" ] && makefile=true
-
-  # Code review
-  [ -n "$coding_style_arg" ] && coding_style=(ananas)
-  [ -n "$gcovr_arg" ] && gcovr=(all)
-  [ -n "$valgrind_arg" ] && valgrind=(all)
-
-  # Cleaning
-  [ -n "$clean_arg" ] && clean=(objects lib)
-  [ -n "$clean_before_arg" ] && clean_before=(objects lib)
-}
+##########
+# CONFIG #
+##########
 
 default_config() {
   # Build options
@@ -71,6 +40,46 @@ default_config() {
   clean_before=(none)
 }
 
+empty_args_config() {
+  # Build options
+  [ -n "$build_arg" ] && build=(all)
+  [ -n "$execute_arg" ] && execute=(all)
+  [ -n "$build_exec_arg" ] && build_exec=(all)
+  [ -n "$live_arg" ] && live=(all)
+  [ -n "$headers_arg" ] && headers=(all)
+  [ -n "$flags_arg" ] && flags=(debug werror)
+
+  # Output paths
+  [ -n "$bin_path_arg" ] && bin_path=main
+  [ -n "$lib_path_arg" ] && lib_path=lib/libmy.a
+  [ -n "$tests_path_arg" ] && tests_path=tests/unit_tests
+
+  # Execution options
+  [ -n "$args_arg" ] && args=('>These<' '>are the defaults<' '>execution args<' '>provided by U.B.<')
+  [ -n "$timeout_arg" ] && timeout=(tests 10)
+  [ -n "$cat_pipe_arg" ] && cat_pipe=true
+  [ -n "$sigkill_arg" ] && sigkill=true
+  [ -n "$makefile_arg" ] && makefile=true
+
+  # Code review
+  [ -n "$coding_style_arg" ] && coding_style=(ananas)
+  [ -n "$gcovr_arg" ] && gcovr=(all)
+  [ -n "$valgrind_arg" ] && valgrind=(all)
+
+  # Cleaning
+  [ -n "$clean_arg" ] && clean=(objects lib)
+  [ -n "$clean_before_arg" ] && clean_before=(objects lib)
+}
+
+#########
+# UTILS #
+#########
+
+error() { echo -e "\e[1;31mERROR:\e[31m $@\e[0m\n"; exit 1; }
+warn() { echo -e "\e[1;33mWARNING:\e[33m $@\e[0m"; }
+success() { echo -e "\e[1;32mSUCCESS:\e[32m $@\e[0m"; }
+info() { echo -e "\e[1;34mINFO:\e[34m $@\e[0m"; }
+
 main() {
   echo
   default_config
@@ -83,18 +92,9 @@ main() {
   get_files
   verify_targets
   print_status
-#  build
+  build
 #  execute
 }
-
-#########
-# UTILS #
-#########
-
-error() { echo -e "\e[1;31mERROR:\e[31m $@\e[0m\n"; exit 1; }
-warn() { echo -e "\e[1;33mWARNING:\e[33m $@\e[0m"; }
-success() { echo -e "\e[1;32mSUCCESS:\e[32m $@\e[0m"; }
-info() { echo -e "\e[1;34mINFO:\e[34m $@\e[0m"; }
 
 ###########
 # PARSING #
@@ -402,10 +402,33 @@ verify_targets() {
 # BUILD & EXECUTE #
 ###################
 
-#build() {
-#}
+build() {
+  build_flags+='-I./include/ '
+  if [ -n "$build_lib" ]; then
+    output=$(gcc -o "$lib_path" "${lib_files[@]}" $build_flags)
+    [ "$?" != 0 ] && echo && error 'Failed to build lib'
+    [ -n "$output" ] && echo
+    success 'Built main\n'
+  fi
+  if [ -n "$build_main" ]; then
+    output=$(gcc -o "$bin_path" "${main_files[@]}" $build_flags)
+    [ "$?" != 0 ] && echo && error 'Failed to build main'
+    [ -n "$output" ] && echo
+    success 'Built main\n'
+  fi
+  if [ -n "$build_tests" ]; then
+    output=$(gcc -o "$tests_path" "${tests_files[@]}" $build_flags)
+    [ "$?" != 0 ] && echo && error 'Failed to build tests'
+    [ -n "$output" ] && echo
+    success 'Built main\n'
+  fi
+}
 
 #execute() {
+#	echo -e '\e[0;1mExecuting ./main...\n\e[33m▼\e[0m'
+#	make --no-print-directory exec_params
+#	echo -e '\e[s\n\e[u\e[33;1m\e[B▲\e[0m\n'
+# echo
 #}
 
 ############
