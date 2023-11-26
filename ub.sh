@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# UB: Ultimate Builder
+# Ultimate Builder
 # By Thomas Baruzier
 #
 
@@ -75,13 +75,14 @@ empty_args_config() {
 # UTILS #
 #########
 
-error() { echo -e "\e[1;31mERROR:\e[31m $@\e[0m\n"; exit 1; }
-warn() { echo -e "\e[1;33mWARNING:\e[33m $@\e[0m"; }
-success() { echo -e "\e[1;32mSUCCESS:\e[32m $@\e[0m"; }
-info() { echo -e "\e[1;34mINFO:\e[34m $@\e[0m"; }
+error() { echo -e "\e[1;31mERROR:\e[0;31m $@\e[0m\n"; exit 1; }
+warn() { echo -e "\e[1;33mWARNING:\e[0;33m $@\e[0m"; }
+success() { echo -e "\e[1;32mSUCCESS:\e[0;32m $@\e[0m"; }
+info() { echo -e "\e[1;34mINFO:\e[0;34m $@\e[0m"; }
 
 main() {
   echo
+  shopt -s globstar
   default_config
   format_linked_args "$@"
   parse_args "${formatted[@]}"
@@ -95,6 +96,42 @@ main() {
   build
 #  execute
 }
+
+###################
+# BUILD & EXECUTE #
+###################
+
+build() {
+  build_flags+='-I./include/ '
+  if [ -n "$build_lib" ]; then
+    cd lib/objects
+    build_flags+='-I./lib/**/ '
+    gcc -c "${lib_files[@]}" $build_flags
+    [ "$?" != 0 ] && echo && error 'Failed to build lib'
+    ar rcs "../../$lib_path" *.o
+    [ "$?" != 0 ] && echo && error 'Failed to build lib'
+    echo && success 'Built lib\n' && cd ../..
+  fi
+  if [ -n "$build_main" ]; then
+    echo "> gcc -o '$bin_path' '${main_files[@]}' $build_flags"
+    gcc -o "$bin_path" "${main_files[@]}" $build_flags
+    [ "$?" != 0 ] && echo && error 'Failed to build main' || echo
+    success 'Built main\n'
+  fi
+  if [ -n "$build_tests" ]; then
+    output=$(gcc -o "$tests_path" "${tests_files[@]}" $build_flags)
+    [ "$?" != 0 ] && echo && error 'Failed to build tests'
+    [ -n "$output" ] && echo
+    success 'Built main\n'
+  fi
+}
+
+#execute() {
+#	echo -e '\e[0;1mExecuting ./main...\n\e[33m▼\e[0m'
+#	make --no-print-directory exec_params
+#	echo -e '\e[s\n\e[u\e[33;1m\e[B▲\e[0m\n'
+# echo
+#}
 
 ###########
 # PARSING #
@@ -337,7 +374,6 @@ get_targets() {
 }
 
 get_files() {
-  shopt -s globstar
   unset main_files tests_files lib_files
   if [ -n "$build_main" ]; then
     for file in *.c; do
@@ -350,11 +386,12 @@ get_files() {
     done
   fi
   if [ -n "$build_lib" ]; then
-    for file in lib/**/*.c; do
+    mkdir -p lib/objects && cd lib/objects
+    for file in ../**/*.c; do
       [ -f "$file" ] && lib_files+=("$file")
     done
+    cd ../..
   fi
-  shopt -u globstar
 }
 
 verify_targets() {
@@ -397,39 +434,6 @@ verify_targets() {
 
   [ -n "$sep" ] && echo
 }
-
-###################
-# BUILD & EXECUTE #
-###################
-
-build() {
-  build_flags+='-I./include/ '
-  if [ -n "$build_lib" ]; then
-    output=$(gcc -o "$lib_path" "${lib_files[@]}" $build_flags)
-    [ "$?" != 0 ] && echo && error 'Failed to build lib'
-    [ -n "$output" ] && echo
-    success 'Built main\n'
-  fi
-  if [ -n "$build_main" ]; then
-    output=$(gcc -o "$bin_path" "${main_files[@]}" $build_flags)
-    [ "$?" != 0 ] && echo && error 'Failed to build main'
-    [ -n "$output" ] && echo
-    success 'Built main\n'
-  fi
-  if [ -n "$build_tests" ]; then
-    output=$(gcc -o "$tests_path" "${tests_files[@]}" $build_flags)
-    [ "$?" != 0 ] && echo && error 'Failed to build tests'
-    [ -n "$output" ] && echo
-    success 'Built main\n'
-  fi
-}
-
-#execute() {
-#	echo -e '\e[0;1mExecuting ./main...\n\e[33m▼\e[0m'
-#	make --no-print-directory exec_params
-#	echo -e '\e[s\n\e[u\e[33;1m\e[B▲\e[0m\n'
-# echo
-#}
 
 ############
 # PRINTING #
